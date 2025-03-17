@@ -7,8 +7,6 @@ concurrent: 5
 timeout: 15000  
 min-speed: 256
 save-method: local
-github-token: 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
-github-gist-id: feccc4a3e06f73e1cae5b00f27281762
 proxyAddr: "127.0.0.1:10808" # Customize this as needed
 api-addr: "127.0.0.1:10085"  # Xray's API address and port
 allOutputFile: "all.yaml"          # Customizable output file for YAML
