@@ -1,0 +1,27 @@
+tcp-test-url: https://www.apple.com/library/test/success.html
+tcp-test-max-speed: 3000 # in ms
+#speed-test-url: https://speed.cloudflare.com/__down?bytes=10485760
+speed-test-url: https://download.parallels.com/desktop/v15/15.1.5-47309/ParallelsDesktop-15.1.5-47309.dmg
+#3rd-party-sub: zrf.zrf.me, sub.keaeye.icu, sub.mot.cloudns.biz
+concurrent: 5
+timeout: 15000  
+min-speed: 256
+save-method: local
+github-token: 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
+github-gist-id: feccc4a3e06f73e1cae5b00f27281762
+proxyAddr: "127.0.0.1:10808" # Customize this as needed
+api-addr: "127.0.0.1:10085"  # Xray's API address and port
+allOutputFile: "all.yaml"          # Customizable output file for YAML
+uniqueNodesFile: "uniqueNodes.txt" # Customizable output file for unique nodes
+#v2ray-api-url: "http://127.0.0.1:10812/api/proxy/setProxy"
+sub-urls:
+  #- https://combine.wondersport.us.kg/p@ssword1C?b64
+  #- https://cf-workers-sub-cuu.pages.dev/p@ssword1C?b64
+  #- https://raw.githubusercontent.com/mfuu/v2ray/master/v2ray
+  # - https://raw.githubusercontent.com/peasoft/NoMoreWalls/master/list_raw.txt
+  # - https://raw.githubusercontent.com/ermaozi/get_subscribe/main/subscribe/v2ray.txt
+  #- https://raw.githubusercontent.com/aiboboxx/v2rayfree/main/v2
+  #- https://raw.githubusercontent.com/mahdibland/SSAggregator/master/sub/airport_sub_merge.txt
+  #- https://raw.githubusercontent.com/mahdibland/SSAggregator/master/sub/sub_merge.txt
+  #- https://raw.githubusercontent.com/Pawdroid/Free-servers/refs/heads/main/sub
+  - https://raw.githubusercontent.com/gousban/subs-check/refs/heads/master/testnodes.txt

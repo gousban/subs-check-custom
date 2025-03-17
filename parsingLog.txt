@@ -1,0 +1,20 @@
+Line 0: Success - VLess proxy parsed
+Line 1: Success - VLess proxy parsed
+Line 2: Success - VLess proxy parsed
+Line 3: Success - VLess proxy parsed
+Line 4: Success - VLess proxy parsed
+Line 5: Success - VLess proxy parsed
+Line 6: Success - VLess proxy parsed
+Line 7: Success - VLess proxy parsed
+Line 8: Success - VLess proxy parsed
+Line 9: Success - VLess proxy parsed
+Parsed 10 nodes, reduced to 6 unique nodes after deduplication
+Total Success: 10
+Total Fail: 0
+SS Success: 0, SS Fail: 0
+VMess Success: 0, VMess Fail: 0
+Trojan Success: 0, Trojan Fail: 0
+Hysteria2 Success: 0, Hysteria2 Fail: 0
+VLess Success: 10, VLess Fail: 0
+--- Parsing Results ---
+Number of remaining nodes after removing duplicates: 1
