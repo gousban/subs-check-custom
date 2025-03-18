@@ -19,12 +19,13 @@ import (
 	"subs-check-custom/types"
 
 	// Alias the Xray-core net package to avoid conflict
-
+	xnet "github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/app/dispatcher"
 	"github.com/xtls/xray-core/app/proxyman/command"
 	"github.com/xtls/xray-core/common/protocol"
 	"github.com/xtls/xray-core/common/serial"
 	"github.com/xtls/xray-core/proxy/vless"
+	"github.com/xtls/xray-core/proxy/vless/outbound"
 )
 
 // dialContextAdapter adapts a proxy.Dialer to a DialContext function
@@ -171,6 +172,71 @@ func tcpTest(cfg types.Config, nodes []types.Proxy, testLogger *log.Logger) []ty
 }
 
 func switchNode(client command.HandlerServiceClient, node types.Proxy, nodeIndex int) error {
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+
+    // Create a VLESS outbound configuration for the node
+    user := &protocol.User{
+        Account: serial.ToTypedMessage(&vless.Account{
+            Id: node.UUID,
+        }),
+    }
+
+    // Construct the VLESS outbound configuration
+    outboundConfig := &command.OutboundHandlerConfig{
+        Tag: fmt.Sprintf("proxy_%d", nodeIndex),
+        ProxySettings: serial.ToTypedMessage(&outbound.Config{
+            Vnext: []*outbound.ServerConfig{
+                {
+                    Address: xnet.NewIPOrDomain(xnet.ParseAddress(node.Server)),
+                    Port:    uint32(node.Port),
+                    Users:   []*protocol.User{user},
+                },
+            },
+        }),
+        SenderSettings: serial.ToTypedMessage(&dispatcher.Config{}),
+        StreamSettings: serial.ToTypedMessage(&command.StreamSettings{
+            Network:  xnet.Network_WebSocket,
+            Security: "tls",
+            WsSettings: &command.WsSettings{
+                Path: node.Path,
+                Headers: map[string]string{
+                    "Host": node.Host,
+                },
+            },
+            TlsSettings: &command.TlsSettings{
+                ServerName: node.SNI,
+            },
+        }),
+    }
+
+    // Remove existing outbound if it exists
+    _, err := client.RemoveOutbound(ctx, &command.RemoveOutboundRequest{
+        Tag: fmt.Sprintf("proxy_%d", nodeIndex),
+    })
+    // Ignore error if outbound doesn't exist
+
+    // Add the new outbound
+    _, err = client.AddOutbound(ctx, &command.AddOutboundRequest{Outbound: outboundConfig})
+    if err != nil {
+        return fmt.Errorf("failed to add outbound: %v", err)
+    }
+
+    // Update routing to use the new outbound
+    _, err = client.AlterOutbound(ctx, &command.AlterOutboundRequest{
+        Tag: "proxy", // Matches config.json outboundTag
+        Operation: serial.ToTypedMessage(&command.Config{
+            Target:  "proxy",
+            FullTag: fmt.Sprintf("proxy_%d", nodeIndex),
+        }),
+    })
+    if err != nil {
+        return fmt.Errorf("failed to alter outbound: %v", err)
+    }
+
+    return nil
+}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
