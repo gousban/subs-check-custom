@@ -22,6 +22,7 @@ type Config struct {
 type Proxy struct {
 	Name           string            `yaml:"name"`
 	Server         string            `yaml:"server"`
+	Host           string            `yaml:"host"`
 	Port           int               `yaml:"port"`
 	Type           string            `yaml:"type"`
 	Cipher         string            `yaml:"cipher,omitempty"`
