@@ -1,34 +1,34 @@
 package main
 
 import (
-	"context"
-	"fmt"
-	"io"
-	"log"
-	"net"
-	"net/http"
-	"os"
-	"sync"
-	"time"
+    "context"
+    "fmt"
+    "io"
+    "log"
+    "net"
+    "net/http"
+    "os"
+    "sync"
+    "time"
 
-	"golang.org/x/net/proxy"
+    "golang.org/x/net/proxy"
+    "google.golang.org/grpc"
+    "google.golang.org/grpc/credentials/insecure"
 
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+    "subs-check-custom/types"
 
-	"subs-check-custom/types"
-
-	// Xray-core imports
-    xnet "github.com/xtls/xray-core/common/net"
     "github.com/xtls/xray-core/app/dispatcher"
-    "github.com/xtls/xray-core/app/proxyman"
     "github.com/xtls/xray-core/app/proxyman/command"
+    xnet "github.com/xtls/xray-core/common/net"
     "github.com/xtls/xray-core/common/protocol"
     "github.com/xtls/xray-core/common/serial"
     "github.com/xtls/xray-core/core"
+    "github.com/xtls/xray-core/infra/conf/configpb" // Added for protocol buffer type
     "github.com/xtls/xray-core/proxy/vless"
     "github.com/xtls/xray-core/proxy/vless/outbound"
     "github.com/xtls/xray-core/transport/internet"
+    "github.com/xtls/xray-core/transport/internet/tls"
+    "github.com/xtls/xray-core/transport/internet/websocket"
 )
 
 // dialContextAdapter adapts a proxy.Dialer to a DialContext function
@@ -103,7 +103,7 @@ func tcpTest(cfg types.Config, nodes []types.Proxy, testLogger *log.Logger) []ty
 				// Use Xray's SOCKS5 proxy
 				dialer, err := proxy.SOCKS5("tcp", cfg.ProxyAddr, nil, proxy.Direct)
 				if err != nil {
-					testLogger.Printf("Node %d: Fail - Failed to create SOCKS5 dialer for %s (%v)", nodeIndex, cfg.ProxyAddr, err)
+					testLogger.Printf("Node %d: Fail - Failed to create SOCKS5 dialer for %s (%v)", nodeIndex, cfg.ProxyAddr, err) // Fixed syntax here
 					failedCount++
 					return
 				}
@@ -178,42 +178,46 @@ func switchNode(client command.HandlerServiceClient, node types.Proxy, nodeIndex
     ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
     defer cancel()
 
-    // Create a VLESS outbound configuration for the node
+    // Create a VLESS user
     user := &protocol.User{
         Account: serial.ToTypedMessage(&vless.Account{
             Id: node.UUID,
         }),
     }
 
-    // Construct the VLESS outbound configuration
-    streamSetting := &proxyman.StreamConfig{
-        Protocol: "http", // Use "http" as a proxy for WebSocket
-        Settings: serial.ToTypedMessage(&internet.WebSocketConfig{
-            Path: node.Path,
-        }),
-        Security: "tls",
-        TlsSettings: serial.ToTypedMessage(&internet.TLSConfig{
-            ServerName: node.SNI,
-        }),
-    }
-
-    outboundConfig := &core.Config{
-        Outbound: []*core.OutboundHandlerConfig{
-            {
-                Tag:           fmt.Sprintf("proxy_%d", nodeIndex),
-                ProxySettings: serial.ToTypedMessage(&outbound.Config{
-                    Vnext: []*protocol.ServerEndpoint{
-                        {
-                            Address: xnet.ParseAddress(node.Server),
-                            Port:    uint32(node.Port),
-                            User:    user,
-                        },
-                    },
-                }),
-                SenderSettings: serial.ToTypedMessage(&dispatcher.Config{}),
-                StreamSetting:  serial.ToTypedMessage(streamSetting),
+    // Construct the VLESS outbound configuration using configpb
+    outbound := &configpb.OutboundHandlerConfig{
+        Tag: fmt.Sprintf("proxy_%d", nodeIndex),
+        ProxySettings: serial.ToTypedMessage(&outbound.Config{
+            Vnext: []*protocol.ServerEndpoint{
+                {
+                    Address: xnet.NewIPOrDomain(xnet.ParseAddress(node.Server)),
+                    Port:    uint32(node.Port),
+                    User:    []*protocol.User{user},
+                },
             },
-        },
+        }),
+        SenderSettings: serial.ToTypedMessage(&dispatcher.Config{}),
+        StreamSettings: serial.ToTypedMessage(&internet.StreamConfig{
+            ProtocolName: "websocket",
+            TransportSettings: []*internet.TransportConfig{
+                {
+                    ProtocolName: "websocket",
+                    Settings: serial.ToTypedMessage(&websocket.Config{
+                        Path: node.Path,
+                        Header: map[string]string{
+                            "Host": node.Server,
+                        },
+                    }),
+                },
+            },
+            SecurityType: "tls",
+            SecuritySettings: []*serial.TypedMessage{
+                serial.ToTypedMessage(&tls.Config{
+                    ServerName: node.SNI,
+                }),
+            },
+        }),
     }
 
     // Remove existing outbound if it exists
@@ -223,9 +227,17 @@ func switchNode(client command.HandlerServiceClient, node types.Proxy, nodeIndex
     // Ignore error if outbound doesn't exist
 
     // Add the new outbound
-    _, err = client.AddOutbound(ctx, &command.AddOutboundRequest{Outbound: outboundConfig})
+    _, err = client.AddOutbound(ctx, &command.AddOutboundRequest{Outbound: outbound})
     if err != nil {
         return fmt.Errorf("failed to add outbound: %v", err)
+    }
+
+    // Update routing to use the new outbound
+    _, err = client.AlterOutbound(ctx, &command.AlterOutboundRequest{
+        Tag: fmt.Sprintf("proxy_%d", nodeIndex),
+    })
+    if err != nil {
+        return fmt.Errorf("failed to alter outbound: %v", err)
     }
 
     return nil
